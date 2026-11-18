@@ -228,6 +228,8 @@ def main(argv=None):
     ap.add_argument('--width', type=int, default=1600)
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--no-cache', action='store_true')
+    ap.add_argument('--from-nodes', metavar='NODES_JSON',
+                    help='直接按平台的 imageSeekTime 出页（不解码视频，几秒一节课）')
     a = ap.parse_args(argv)
 
     video = a.video if os.path.isabs(a.video) else os.path.join(a.course_dir, 'videos', a.video)
@@ -235,6 +237,37 @@ def main(argv=None):
         sys.exit('找不到视频: %s' % video)
     t0 = time.time()
     dur = probe_duration(video)
+    if a.from_nodes:
+        nodes2 = load_nodes(a.from_nodes)
+        times, last = [], -99.0
+        for t, _txt, _iid in nodes2:
+            if t - last >= 2.0:          # 平台在动画上会连发好几个点，2s 内只取第一个
+                times.append(t)
+                last = t
+        print('平台时间点 %d → 去抖后 %d 页（跳过解码）' % (len(nodes2), len(times)))
+        out = a.out or os.path.join(a.course_dir,
+                                    'slides-%s.pdf' % os.path.basename(video).replace('.mp4', ''))
+        tmpdir = tempfile.mkdtemp(prefix='slides-')
+        pages = []
+        try:
+            for i, t in enumerate(times):
+                jpg = os.path.join(tmpdir, '%04d.jpg' % i)
+                grab_jpeg(video, t, jpg, width=a.width)
+                pages.append((jpg, a.width, int(round(a.width * 9 / 16.0)), t))
+            write_pdf(pages, out)
+        finally:
+            for q in pages:
+                try:
+                    os.unlink(q[0])
+                except OSError:
+                    pass
+            try:
+                os.rmdir(tmpdir)
+            except OSError:
+                pass
+        print('完成: %s  %d 页  %.1f MB  用时 %.1fs'
+              % (out, len(pages), os.path.getsize(out) / 1e6, time.time() - t0))
+        return
     print('视频 %.1f min / %.0f MB  采样 %g fps' % (dur / 60, os.path.getsize(video) / 1e6, a.fps))
     thumbs = thumbnails_cached(video, a.fps)
     print('  缩略图 %d 张（%.1fs）' % (len(thumbs), time.time() - t0))

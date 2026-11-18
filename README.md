@@ -102,9 +102,19 @@ python3 backend/vodctl.py status|start|stop|restart|ensure [18080|18766|all]
 `scripts/ppt_to_pdf.py` 把一堂课的课件通道压成一份 PDF（一页一张幻灯片）：
 
 ```bash
+# ① 有平台页数据（nodes.json）时：直接用它的时间点，不解码视频，一节课十几秒
+python3 scripts/ppt_to_pdf.py <课程目录> <课件视频文件> \
+        --from-nodes <课程目录>/subtitles/<label>.nodes.json -o 第06周.pdf
+
+# ② 没有平台数据时：靠缩略图差分自己切页（一支 60 min 课件约 85 s）
+python3 scripts/ppt_to_pdf.py <课程目录> <课件视频文件> -o 第03周.pdf --dry-run
 python3 scripts/ppt_to_pdf.py <课程目录> <课件视频文件> -o 第03周.pdf
-python3 scripts/ppt_to_pdf.py <课程目录> <课件视频文件> --dry-run   # 先看切了多少页
 ```
+
+实测（同一门课）：
+- `--from-nodes`：43 页，**14 s**；
+- 自研切页：默认阈值 25 页 / 85 s；`--dedup 0` 保留每一次变化（≈49 页），接近平台给的 43 页；
+- 平台自己的 43 个时间点里有 13 处间隔 < 8 s（幻灯片动画被当成新页），所以「一页一张」和「一次变化一张」是两种需求，用 `--dedup` 调。
 
 做法：先把视频缩成 64×48 灰度缩略图取帧间差 → 差异超阈值就切页 → 取「动画播完」的稳定帧 →
 跨页去重（翻回上一页的不重复出图）→ 按时间点从 1080p 原片提一张 JPEG → 用纯标准库写 PDF
