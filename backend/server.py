@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""huanYuan (source-replacement) backend for it_stu171 @ head2."""
+"""huanYuan (source-replacement) backend for <user> @ <node>."""
 """v1.8: fast-seek (WILLNEED read-ahead + 60s write timeout), multi-speed friendly
      (TCP flow control + aggressive page-cache warming), stutter awareness
      (client telemetry A + server rebuffer-inference B), persistent progress,

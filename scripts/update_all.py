@@ -26,6 +26,8 @@ MINT = os.path.join(ROOT, 'scripts', 'mint_vod_token.py')
 FETCH_NODES = os.path.join(ROOT, 'backend', 'fetch_nodes.py')
 DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
+SKIP_CHANNELS = set()      # --channels 过滤：只下载这些通道（空 = 全下）
+
 VIEW_NAMES = {1: 'teacher1', 2: 'teacher2', 3: 'student1', 4: 'student2',
               5: 'ppt', 6: 'whiteboard', 7: 'composite'}
 AUTH_HINT = '认证失败：token 过期或 normandy 会话失效。先跑 python3 %s' % MINT
@@ -290,6 +292,8 @@ def update_course(c, acc, dry_run):
                     have[vn] = ch
                 ch['file'] = dest
                 ch['duration_s'] = v.get('vodTime') or ch.get('duration_s')
+                if SKIP_CHANNELS and not any(t in vn for t in SKIP_CHANNELS):
+                    continue                       # 只要部分通道：其余登记但不下载
                 if not os.path.isfile(dest) or os.path.getsize(dest) == 0 or os.path.isfile(dest + '.part'):
                     size = download_file(v['url'], dest)
                     files += 1
@@ -314,7 +318,13 @@ def main():
     ap.add_argument('--dry-run', action='store_true', help='只列差异，不下载')
     ap.add_argument('--refresh', action='store_true', help='强制重新铸造 token')
     ap.add_argument('--no-nodes', action='store_true', help='不补 PPT 节点')
+    ap.add_argument('--channels', default='', help='只下载匹配的通道，逗号分隔，如 ppt（只下课件）. 默认全下')
     args = ap.parse_args()
+
+    global SKIP_CHANNELS
+    if args.channels.strip():
+        SKIP_CHANNELS = set(x.strip() for x in args.channels.split(',') if x.strip())
+        print('只下载通道: %s' % ','.join(sorted(SKIP_CHANNELS)), flush=True)
 
     catalog = read_json(CATALOG) or []
     todo = [c for c in catalog if not args.tecl or int(c['teclId']) in set(args.tecl)]

@@ -362,7 +362,7 @@ os.replace(tmp, dest)                     # 原子落地
  "sessions":[{"id":136658,"time":"2026-09-15 10:00:00","week":2,
    "label":"wk02_20260915_id136658","subtitle_lines":412,
    "channels":[{"channel":"teacher1","viewNum":1,"duration_s":5700,
-                "file":"/cluster/home/.../videos/wk02_20260915_id136658_1.mp4",
+                "file":"~/vod-research/<课程>/videos/wk02_20260915_id136658_1.mp4",
                 "size_bytes":1234567890}]}]}
 ```
 

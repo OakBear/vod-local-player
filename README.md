@@ -6,6 +6,37 @@
 > 只含代码，不含任何视频、字幕、课件或平台前端资源。凭据必须自己提供，登录与下载是你自己的账号行为。
 > 仅供个人学习使用，请遵守所在学校的使用条款。
 
+## 新手先看这个
+
+整套东西只有两个前提：**你自己的账号能看这些课**，以及**把浏览器里的两层凭据导出来**。
+
+| 层 | 是什么 | 存哪 | 有效期 |
+|---|---|---|---|
+| L1 OC 会话 | `_normandy_session`（课程平台 Cookie） | `credentials/normandy.txt` | 几天～几周，用来换票 |
+| L2 播放器票 | `..._STORAGE_KEY_JWT_TOKEN`（内含 `accessToken`） | `<课程>/scripts/jwt.txt` | 约 2 小时，用来调接口 |
+
+**上手五步**（每步都能单独验证，卡住就知道卡在哪）：
+
+```bash
+# 1. 体检：两层凭据在不在、过期没
+python3 scripts/token_status.py
+
+# 2. 拿 L1 换 L2（L1 失效会明确告诉你 HTTP 302）
+python3 scripts/mint_vod_token.py
+
+# 3. 看看远端比本地多了什么（不下载）
+python3 scripts/update_all.py --dry-run
+
+# 4. 下载并补 PPT 节点
+python3 scripts/update_all.py
+
+# 5. 起服务，浏览器开 127.0.0.1:18080
+backend/vodctl.py start
+```
+
+取 Cookie 的每一步（DevTools 点哪里、复制哪一段、怎么检查贴错）都在
+**[docs/凭据与Cookie指南.md](docs/凭据与Cookie指南.md)**。
+
 ## 为什么需要它
 
 官方播放器的问题不是「服务器慢」，而是链路上每一跳都在限制你：
@@ -22,8 +53,8 @@
 
 ![播放器](docs/player.png)
 
-> 左边大画面是教师视频，右上小窗是**课件图片**（这一路不发视频流），下面 `PPT 跳转` 是平台 AI 抽出的幻灯片节点，
-> 右侧是节次列表与逐句字幕。截图里的课程与字幕是真实内容，**仓库若改为 public 请先删掉这张图**。
+> 左边大画面是教师视频，右上小窗是**课件图片**（这一路不发视频流），底部 `PPT 跳转` 是平台 AI 抽出的
+> 幻灯片节点（点一下直接跳到那一页），右侧原本是节次列表与逐句字幕（截图已裁掉）。
 
 ## 结构
 
@@ -121,6 +152,30 @@ python3 scripts/ppt_to_pdf.py <课程目录> <课件视频> --emit-images <课�
 实测（一节 60 min 的课）：课件图片 25–28 页共 **2.9–3.2 MB**，而课件视频是 **398 MB / 1 Mbps 持续**。
 同一次播放服务端日志里只剩 `teacher1.mp4` 一路传输。
 
+## 只要课件（不下载教师视频）
+
+课件通道通常占一半体积，而且真正想留的是幻灯片。两条路：
+
+```bash
+# 路线 A：只下载"课件"这一路通道（教师画面跳过，体积约省一半）
+python3 scripts/update_all.py --channels ppt
+
+# 然后把它压成图片 / PDF
+python3 scripts/emit_all_slides.py --course blockchain-apps
+python3 scripts/ppt_to_pdf.py blockchain-apps wk06_20261010_id174784_ppt.mp4 \
+        --from-nodes blockchain-apps/subtitles/wk06_20261010_id174784.nodes.json
+```
+
+```bash
+# 路线 B：连视频都不下，只要 PDF → 先只拉节点（几 MB），再出图
+python3 backend/fetch_nodes.py                 # 拉每节的幻灯片时间点 + OCR 文本
+python3 scripts/ppt_to_pdf.py blockchain-apps wk06_20261010_id174784_ppt.mp4 \
+        --from-nodes blockchain-apps/subtitles/wk06_20261010_id174784.nodes.json \
+        --dry-run                              # 先看要出几页
+```
+
+`--channels` 收逗号分隔的通道名（`ppt`、`teacher1`…），只影响**下载**，manifest 里的其它通道照旧登记。
+
 ## 课件视频 → PDF
 
 `scripts/ppt_to_pdf.py` 把一堂课的课件通道压成一份 PDF（一页一张幻灯片）：
@@ -173,9 +228,17 @@ python3 scripts/ppt_to_pdf.py <课程目录> <课件视频文件> -o 第03周.pd
 
 ## 文档
 
+- [**凭据与 Cookie 指南**](docs/凭据与Cookie指南.md)：两层凭据从哪取、贴到哪、过期了怎么续（新手先看这个）
 - [后端技术文档](docs/VOD后端技术文档.md)：路由、媒体服务、进度、日志、参数表、排障
 - [前端技术文档](docs/VOD前端技术文档.md)：双播放器模型、错峰与预热、埋点、交互事件表
 - [早期架构笔记](docs/architecture-legacy.md)
+
+## 合法使用
+
+- 只处理**你自己账号有权访问**的课程；凭据（`normandy.txt` / `jwt.txt`）等同密码，不要分享、不要提交。
+- 采集到的视频、字幕、课件属于课程与讲者，**只限个人离线观看**，不要二次分发。
+- 本仓库不含任何视频、字幕、课件或平台前端资源；若平台方或学校对本项目有异议，会立即下架。
+- 请遵守所在学校的网络与信息使用规定。
 
 ## License
 
