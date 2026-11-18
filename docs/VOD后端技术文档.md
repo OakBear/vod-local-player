@@ -492,3 +492,15 @@ curl -s  127.0.0.1:18080/api/progress
 | P1 | 版本号统一、`/api/version` | 以前 Header 1.6 / 横幅 v1.4 / 实际 v1.7 |
 | P2 | rebuffer 推断排除 `start==0` | 用户点回片头会被算成一次 rebuffer（实测两次从 0 起的请求让计数 +2），数字虚高 |
 | 工程 | `~/vod-research` 纳入 git | 之前没有版本控制，「跑的是旧代码」只能靠日志横幅推断 |
+
+### 2026-11-18 课件通道改走图片流
+
+| 改动 | 细节 |
+|---|---|
+| 新增路由 | `GET /api/slides/<teclId>/<label>` 返回页索引 `{count,pages:[{t,file}]}`；`GET /media/<teclId>/slides/<label>/NNN.jpg` 返回单页图片（`CTYPE['slides']='image/jpeg'`，`MEDIA_RE` 的 kind 增加 `slides`） |
+| 数据来源 | `scripts/ppt_to_pdf.py --emit-images`：有 `nodes.json` 时用平台 `imageSeekTime`（3–14 s/节），没有则缩略图差分切页（~85 s/节）；产物 `<课程>/slides/<label>/{index.json,NNN.jpg}`，平均 **150 KB/页** |
+| 前端 | 选节时并行取索引，命中就把小画面换成 `<img>` 并按主画面 `currentTime` 二分查找切图（预取下一张），**这一路视频流不再发送**；PPT 若被选成主画面会与视频换位；⤢ 放大；互换/换通道时退回视频流 |
+| 实测 | 一次播放只剩 `teacher1.mp4` 一路传输；课件侧从 1 Mbps 连续流（398 MB/节）降到 2.9–3.2 MB/节 |
+
+> 注意：这是「预生成图片」而不是实时转码，所以新增/重下一节课后要跑一次
+> `python3 scripts/emit_all_slides.py --course <dir>`（幂等，已导出的跳过）。
