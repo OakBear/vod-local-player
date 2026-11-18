@@ -97,6 +97,23 @@ python3 backend/vodctl.py status|start|stop|restart|ensure [18080|18766|all]
 - 日志：`/tmp/huanyuan.log`（18080）、`/tmp/keda18766.log`（18766）、
   `backend/playback.jsonl`（结构化诊断，10 MB × 5 轮转）。
 
+## 课件通道：图片代替视频（省一半带宽）
+
+真 PPT 是静态的。课件通道（1 Mbps 的屏幕录制）完全可以换成「按时间轴换一张 JPG」：
+
+```bash
+# 每节导出课件页图片（有平台时间点时 9 s/节，没有时约 85 s/节）
+python3 scripts/ppt_to_pdf.py <课程目录> <课件视频> --emit-images <课程目录>/slides/<label>
+```
+
+后端多两条路由：`GET /api/slides/<teclId>/<label>`（页索引）与
+`GET /media/<teclId>/slides/<label>/NNN.jpg`（单页图片）。
+播放器选节时先取索引：命中就把小画面换成 `<img>`，**这一路视频流直接不发**，
+滚到哪张图就取哪张（提前预取下一张）；没命中就照旧走视频。
+
+实测（一节 60 min 的课）：课件图片 25–28 页共 **2.9–3.2 MB**，而课件视频是 **398 MB / 1 Mbps 持续**。
+同一次播放服务端日志里只剩 `teacher1.mp4` 一路传输。
+
 ## 课件视频 → PDF
 
 `scripts/ppt_to_pdf.py` 把一堂课的课件通道压成一份 PDF（一页一张幻灯片）：

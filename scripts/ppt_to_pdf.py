@@ -201,6 +201,22 @@ def write_pdf(pages, out_path, page_w=960.0):
                 % (len(objs) + 1, catalog, xref))
 
 
+def emit_images(video, times, outdir, width, label, source):
+    """把每一页导出成 jpg，并写 index.json（播放器按时间轴切图）。"""
+    if not os.path.isdir(outdir):
+        os.makedirs(outdir)
+    pages = []
+    for i, t in enumerate(times):
+        name = '%03d.jpg' % (i + 1)
+        grab_jpeg(video, t, os.path.join(outdir, name), width=width)
+        pages.append({'t': round(float(t), 2), 'file': name})
+    idx = {'label': label, 'source': source, 'width_px': width,
+           'count': len(pages), 'generated': int(time.time()), 'pages': pages}
+    with open(os.path.join(outdir, 'index.json'), 'w', encoding='utf-8') as f:
+        json.dump(idx, f, ensure_ascii=False, indent=1)
+    return pages
+
+
 def load_nodes(path):
     with open(path, encoding='utf-8') as f:
         d = json.load(f)
@@ -228,6 +244,8 @@ def main(argv=None):
     ap.add_argument('--width', type=int, default=1600)
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--no-cache', action='store_true')
+    ap.add_argument('--emit-images', metavar='DIR',
+                    help='不做 PDF，而是把每页导出成 slide-NNN.jpg + index.json（给播放器当图片流用）')
     ap.add_argument('--from-nodes', metavar='NODES_JSON',
                     help='直接按平台的 imageSeekTime 出页（不解码视频，几秒一节课）')
     a = ap.parse_args(argv)
@@ -245,6 +263,11 @@ def main(argv=None):
                 times.append(t)
                 last = t
         print('平台时间点 %d → 去抖后 %d 页（跳过解码）' % (len(nodes2), len(times)))
+        if a.emit_images:
+            label = os.path.basename(video).replace('_ppt.mp4', '').replace('.mp4', '')
+            pg = emit_images(video, times, a.emit_images, a.width, label, os.path.basename(video))
+            print('完成: %s  %d 页图片  用时 %.1fs' % (a.emit_images, len(pg), time.time() - t0))
+            return
         out = a.out or os.path.join(a.course_dir,
                                     'slides-%s.pdf' % os.path.basename(video).replace('.mp4', ''))
         tmpdir = tempfile.mkdtemp(prefix='slides-')
@@ -283,6 +306,12 @@ def main(argv=None):
             print('  %3d  %6.1f–%6.1f s' % (i + 1, start, end))
         return
 
+    if a.emit_images:
+        label = os.path.basename(video).replace('_ppt.mp4', '').replace('.mp4', '')
+        pg = emit_images(video, [s0 for (s0, _e, _r, _k) in kept], a.emit_images, a.width,
+                         label, os.path.basename(video))
+        print('完成: %s  %d 页图片  用时 %.1fs' % (a.emit_images, len(pg), time.time() - t0))
+        return
     out = a.out or os.path.join(a.course_dir, 'slides-%s.pdf' % os.path.basename(video).replace('.mp4', ''))
     tmpdir = tempfile.mkdtemp(prefix='slides-')
     pages = []

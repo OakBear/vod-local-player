@@ -50,7 +50,12 @@ header.top{height:48px;display:flex;align-items:center;gap:10px;padding:0 12px;b
 .pip{position:absolute;right:12px;top:12px;width:26%;min-width:148px;max-width:320px;aspect-ratio:16/9;background:#000;border:1px solid rgba(255,255,255,.28);border-radius:8px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:3}
 .pip.hide{display:none}
 .pip.dragging{box-shadow:0 12px 30px rgba(0,0,0,.65);opacity:.94}
+.pip.big{width:62%;max-width:none}
 .pip video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;cursor:pointer}
+.pip img#pipImg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:none;cursor:pointer}
+.pip.slides video#vPip{display:none}
+.pip.slides img#pipImg{display:block}
+.pip.slides{background:#0b0f12}
 .pipbar{position:absolute;top:0;left:0;right:0;height:20px;display:flex;align-items:center;gap:4px;padding:0 6px;background:rgba(10,16,20,.62);color:#dcecee;font-size:10.5px;cursor:move;user-select:none;touch-action:none;z-index:2}
 .pipbar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.9}
 .pipbar button{border:0;background:rgba(255,255,255,.14);color:#eaf6f7;border-radius:4px;height:15px;padding:0 4px;font-size:10px;line-height:1}
@@ -128,8 +133,10 @@ header.top{height:48px;display:flex;align-items:center;gap:10px;padding:0 12px;b
         <div class="pipbar" id="pipBar">
           <span id="pipName">小画面</span>
           <button id="pipAudio" type="button" title="声音跟随该画面">🔇</button>
+          <button id="pipBig" type="button" title="放大/还原小画面">⤢</button>
         </div>
         <video id="vPip" playsinline preload="metadata" muted></video>
+        <img id="pipImg" alt="课件页面" draggable="false">
       </div>
     </div>
 
@@ -189,6 +196,8 @@ let courses=[],course=null,manifest=null,session=null;
 let leader=0,guard=false,dragging=false,userActed=false;
 let nodes=[],cues=[],curNode=-1,curCue=-1,curSub=-1,userScrolledAt=0,lastSave=0;
 let subsOn=true,audioSlot=0;
+/* 课件走图片：真 PPT 是静态的，与其拉 1 Mbps 的视频流，不如按时间轴换一张 ~130 KB 的 JPG */
+let slides={on:false,label:'',pages:[],idx:-1,tecl:''};
 
 /* ---------- 首帧埋点：选节 → loadedmetadata → canplay，结果 POST /api/telemetry ---------- */
 let T={t0:0,meta:0,canplay:0,defer:0,warmed:0,sent:false};
@@ -237,6 +246,7 @@ function seekAll(t){
   });
   setTimeout(()=>{guard=false},160);
   updateProgress();
+  syncSlide(true);
 }
 
 /* ---------- channels ---------- */
@@ -290,8 +300,55 @@ function loadChannel(i,from){
   s.v.load();
   syncLayout();
 }
+function slideLabel(ch){
+  if(!ch||!ch.file||ch.channel.indexOf('ppt')<0)return '';
+  return String(ch.file).split('/').pop().replace(/_ppt\.mp4$/,'').replace(/\.mp4$/,'');
+}
+function loadSlides(ch){                       /* 有索引就用图片，没有就照旧走视频 */
+  const label=slideLabel(ch);
+  slides={on:false,label:label,pages:[],idx:-1,tecl:course?String(course.teclId):''};
+  $('pip').classList.remove('slides');
+  if(!label||!course)return;
+  fetch('/api/slides/'+course.teclId+'/'+encodeURIComponent(label),{cache:'no-cache'})
+    .then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!d.pages||!d.pages.length||!session)return;
+      slides.on=true; slides.pages=d.pages; slides.label=label;
+      slots[1].pending=null;                    /* 取消小画面发流 */
+      const v=slots[1].v; v.removeAttribute('src'); v.load();
+      $('pip').classList.add('slides');
+      tmark('defer');
+      syncSlide(true);
+      syncLayout();
+      flashBar('课件改用图片流（省一路视频带宽）');
+    }).catch(()=>{});
+}
+function slideIndexAt(t){
+  const p=slides.pages; let lo=0,hi=p.length-1,idx=0;
+  while(lo<=hi){const mid=(lo+hi)>>1;if(p[mid].t<=t){idx=mid;lo=mid+1}else hi=mid-1}
+  return idx;
+}
+function syncSlide(force){
+  if(!slides.on||!slides.pages.length)return;
+  const v=leaderVideo(); if(!v)return;
+  const i=slideIndexAt(v.currentTime||0);
+  if(i===slides.idx&&!force)return;
+  slides.idx=i;
+  const url='/media/'+slides.tecl+'/slides/'+slides.label+'/'+slides.pages[i].file;
+  $('pipImg').src=url;
+  const nx=slides.pages[i+1]; if(nx)new Image().src='/media/'+slides.tecl+'/slides/'+slides.label+'/'+nx.file;
+}
+function disableSlides(){                       /* 用户要互换/看视频时退回视频流 */
+  if(!slides.on)return;
+  slides.on=false;
+  $('pip').classList.remove('slides');
+  $('pipImg').removeAttribute('src');
+  const v=leaderVideo();
+  if(slots[1].ch&&v)setChannel(1,slots[1].ch,v.currentTime);
+}
+
 function releasePending(){
   const s=slots[1];
+  if(slides.on){s.pending=null;return}        /* 课件走图片，不需要小画面视频流 */
   if(s&&s.pending&&s.ch){tmark('defer');loadChannel(1,s.pending.t)}
 }
 function syncLayout(){
@@ -303,14 +360,18 @@ function syncLayout(){
   applyAudio();
 }
 function applyAudio(){
-  const target=alive(slots[audioSlot])?audioSlot:(alive(slots[0])?0:1);
+  let want=audioSlot;
+  if(slides.on&&want===1)want=0;                 /* 小画面是图片时，声音只能走主画面 */
+  const target=alive(slots[want])?want:(alive(slots[0])?0:1);
   slots.forEach((s,j)=>{s.v.muted=j!==target});
-  $('pipAudio').textContent=target===1?'🔊':'🔇';
+  $('pipBig').onclick=e=>{e.stopPropagation();$('pip').classList.toggle('big')};
+$('pipAudio').textContent=target===1?'🔊':'🔇';
   $('pipAudio').classList.toggle('on',target===1);
 }
 function swap(){
   const a=slots[0].ch,b=slots[1].ch;
   if(!a||!b)return;
+  if(slides.on){disableSlides()}                 /* 图片模式不支持当主画面，先退回视频 */
   const t=leaderVideo()?leaderVideo().currentTime:0;
   audioSlot=audioSlot===0?1:0;
   setChannel(0,b,t);
@@ -545,6 +606,8 @@ function selectSession(s,startAt){
     if(m&&p&&m!==p){a=m;b=p}
     else if(m){a=m;b=chs.find(c=>c!==m)||null}
   }
+  /* 课件图片模式只在小画面生效：PPT 若被选成主画面，就和视频那一路换位 */
+  if(slideLabel(a)&&!slideLabel(b)&&b){const tmp=a;a=b;b=tmp}
   const t=Number(startAt)||0;
   audioSlot=0;
   resetTiming();
@@ -552,6 +615,7 @@ function selectSession(s,startAt){
   warmChannel(a);                                    /* 先预热主画面，首帧多半直接命中 page cache */
   setChannel(0,a,t);
   setChannel(1,b,t,{defer:true});                    /* 小画面等主画面元数据到手再发流 */
+  loadSlides(b);                                     /* 若这节有课件图片索引，小画面改走图片 */
   setTimeout(releasePending,2500);                   /* 兜底：主画面一直没 metadata 也不至于永远不出小窗 */
   setTimeout(()=>{if(!T.sent){hideBadge();reportTiming()}},15000);
   if(prev&&prev.audio&&chKey(slots[1].ch)===prev.audio)audioSlot=1;   // 声音跟谁走也按上次恢复
@@ -724,6 +788,7 @@ slots.forEach((s,i)=>{
   s.v.addEventListener('seeking',()=>{if(!guard)leader=i});
   s.v.addEventListener('timeupdate',()=>{
     if(i===leader||!alive(slots[leader]))updateProgress();
+    if(i===leader)syncSlide();
   });
   s.v.addEventListener('click',e=>{if(i===0)togglePlay()});
   s.v.addEventListener('dblclick',()=>toggleFullscreen());

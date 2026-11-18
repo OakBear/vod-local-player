@@ -21,9 +21,11 @@ VERSION = '1.8'
 STARTED_AT = int(time.time())
 
 COURSE_RE = re.compile(r'^/api/course/(\d+)$')
-MEDIA_RE  = re.compile(r'^/media/(\d+)/(videos|subtitles|audio)/(.+)$')
+MEDIA_RE  = re.compile(r'^/media/(\d+)/(videos|subtitles|audio|slides)/(.+)$')
+SLIDES_RE = re.compile(r'^/api/slides/(\d+)/([A-Za-z0-9_.-]+)$')
 WARM_RE   = re.compile(r'^/api/warm/(\d+)/(.+)$')
-CTYPE = {'videos': 'video/mp4', 'subtitles': 'application/x-subrip; charset=utf-8', 'audio': 'audio/mp4'}
+CTYPE = {'videos': 'video/mp4', 'subtitles': 'application/x-subrip; charset=utf-8', 'audio': 'audio/mp4',
+         'slides': 'image/jpeg'}
 FRONTEND = os.path.join(ROOT, 'frontend')   # 用户从 Windows 上传的前端静态文件
 EXT_CT = {'.html':'text/html; charset=utf-8', '.htm':'text/html; charset=utf-8',
           '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8',
@@ -615,6 +617,26 @@ class H(BaseHTTPRequestHandler):
             if mfp and os.path.isfile(mfp):
                 self._json(json.load(open(mfp, encoding='utf-8'))); return
             self._json({'error': 'no manifest yet (still downloading?)'}, 404); return
+        m = SLIDES_RE.match(path)
+        if m:
+            tecl, label = m.group(1), m.group(2)
+            d = course_dir(tecl)
+            if not d: self._json({'error': 'unknown teclId'}, 404); return
+            idx = os.path.join(d, 'slides', label, 'index.json')
+            if not os.path.isfile(idx):
+                self._json({'error': 'no slides', 'label': label}, 404); return
+            self._file(idx, 'slides') if False else None
+            try:
+                with open(idx, 'rb') as f: body = f.read()
+            except OSError as e:
+                self._json({'error': str(e)}, 500); return
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-cache')
+            self._cors(); self.end_headers(); self.wfile.write(body)
+            return
+
         m = MEDIA_RE.match(path)
         if m:
             tecl, kind, fname = m.group(1), m.group(2), m.group(3)
