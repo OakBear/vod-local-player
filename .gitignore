@@ -1,0 +1,33 @@
+# 凭据（本地才有）
+credentials/
+cookies.txt
+*.token
+jwt.txt
+bearer.txt
+normandy.txt
+
+# 媒体与派生数据
+*/videos/
+*/audio/
+*/subtitles/
+*.mp4
+*.m4a
+*.srt
+*.pdf
+
+# 运行时状态与日志
+backend/progress.json
+backend/progress.json.bak-*
+backend/playback.jsonl*
+backend/run/
+*.log
+__pycache__/
+*.pyc
+
+# 平台前端资源（不随仓库分发，见 README）
+frontend/original-vod-prototype/static/
+
+# 备份
+backup-*/
+*.bak
+*.bak-*

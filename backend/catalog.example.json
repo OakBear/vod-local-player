@@ -1,0 +1,14 @@
+[
+ {
+  "teclId": 10001,
+  "name": "示例课程 A",
+  "dir": "example-course-a",
+  "canvasId": 900001
+ },
+ {
+  "teclId": 10002,
+  "name": "示例课程 B",
+  "dir": "example-course-b",
+  "canvasId": 900002
+ }
+]
