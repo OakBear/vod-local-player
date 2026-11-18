@@ -79,8 +79,8 @@ chmod 600 ~/vod-research/blockchain-apps/scripts/jwt.txt
 
 > 如果终端里 `Ctrl+Shift+V` 粘不进去，说明你用的是 SSH 精简终端，改用方式 B 复制，或用 `scp` 传文件。
 
-脚本对两种写法都兼容：既能读裸 JWT，也能读 `jy-application-resourcemanage-ui_STORAGE_KEY_JWT_TOKEN=eyJ...`
-这种整段 Cookie 串（`update_all.py` 里会正则抠出来）。
+脚本对两种写法都兼容：既能读裸 JWT，也能读「`STORAGE_KEY_JWT_TOKEN` 后面跟一段 JWT」那种整段 Cookie 串
+（`update_all.py` 里会正则抠出来）。**不要**把带等号的整段贴进对话或提 issue。
 
 ## 3. 三个容易混淆的文件
 
