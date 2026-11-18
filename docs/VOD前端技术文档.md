@@ -92,7 +92,7 @@ manifest 里 `channels[].file` 是 **<node> 上的绝对路径**，前端只取 
 ```js
 const base  = p => String(p||'').split(/[\\/]/).pop();
 const media = (id,kind,f) => API+'/media/'+encodeURIComponent(id)+'/'+kind+'/'+encodeURIComponent(f);
-// 例：/media/10730/videos/wk02_20260915_id136658_1.mp4
+// 例：/media/<teclId>/videos/wk02_20260915_id<sid>_1.mp4
 ```
 
 `API` 的推导：只有当页面本身跑在 `127.0.0.1:18080/18081` 时才用 `location.origin`，否则硬编码 `http://127.0.0.1:18080`（兼容从 18766 或 `file://` 打开的情况）。
@@ -430,7 +430,7 @@ flushState()   → fetch(POST /api/progress, {keepalive:true})
 **首帧埋点**（`event:'timing'`，每次选节一条）：
 
 ```json
-{"teclId":"8537","file":"sid:232920","event":"timing",
+{"teclId":"8537","file":"sid:<sid>","event":"timing",
  "meta_ms":161,"canplay_ms":228,"defer_ms":161,"warmed":1,
  "main_ch":"5-ppt","pip_ch":"1-teacher1"}
 ```

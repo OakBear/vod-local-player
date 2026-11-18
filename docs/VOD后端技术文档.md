@@ -149,8 +149,8 @@ except (BrokenPipeError, ConnectionResetError, socket.timeout):
 ### 4.6 播放日志（`playback.jsonl`）
 
 ```json
-{"record":"transfer_window","teclId":10730,"file":"wk02_..._1.mp4","seconds":15.0,"bytes":...,"bytes_per_second":...,"ts":...}
-{"record":"transfer_end","teclId":10730,"file":"...","range_start":0,"range_end":...,"bytes":...,"seconds":...,"bytes_per_second":...,"outcome":"complete|interrupted|short_read","ts":...}
+{"record":"transfer_window","teclId":<teclId>,"file":"wk02_..._1.mp4","seconds":15.0,"bytes":...,"bytes_per_second":...,"ts":...}
+{"record":"transfer_end","teclId":<teclId>,"file":"...","range_start":0,"range_end":...,"bytes":...,"seconds":...,"bytes_per_second":...,"outcome":"complete|interrupted|short_read","ts":...}
 {"record":"player","teclId":...,"event":"waiting","rate":1.5,"buffered_depth_s":2.1,...}
 ```
 
@@ -200,9 +200,9 @@ pos = int(end * duration / size)   # duration 来自 manifest 的 channels[].dur
 
 ```json
 {"version":1,
- "last":{"teclId":10730,"sid":136658,"t":1832,"ts":1762700000000,
+ "last":{"teclId":<teclId>,"sid":<sid>,"t":1832,"ts":1762700000000,
          "main":"1-teacher1","pip":"5-ppt","audio":"1-teacher1","rate":1,"subs":true},
- "sessions":{"10730:136658":{"t":1832,"ts":1762700000000}},
+ "sessions":{"<teclId>:<sid>":{"t":1832,"ts":1762700000000}},
  "updated":1762700000000}
 ```
 
@@ -227,7 +227,7 @@ pos = int(end * duration / size)   # duration 来自 manifest 的 channels[].dur
 **A：客户端上报**（`POST /api/telemetry`）
 
 ```json
-{"teclId":10730,"file":"wk02_..._1.mp4","event":"waiting|stalled",
+{"teclId":<teclId>,"file":"wk02_..._1.mp4","event":"waiting|stalled",
  "buffered_depth_s":2.1,"readystate":3,"rate":1.5,"position_s":1830,
  "total_frames":...,"dropped_frames":...,"visible":true}
 ```
@@ -302,7 +302,7 @@ def keda_wrap(data):
 ```bash
 python3 ~/vod-research/scripts/update_all.py            # 全部课程，缺什么补什么
 python3 ~/vod-research/scripts/update_all.py --dry-run  # 只列差异
-python3 ~/vod-research/scripts/update_all.py --tecl 10730 8537
+python3 ~/vod-research/scripts/update_all.py --tecl <teclId> 8537
 python3 ~/vod-research/scripts/update_all.py --refresh  # 强制铸新 token
 python3 ~/vod-research/scripts/update_all.py --no-nodes # 不补 PPT 节点
 ```
@@ -350,19 +350,19 @@ os.replace(tmp, dest)                     # 原子落地
 8 门课，字段 `{teclId, name, dir, canvasId}`。后端据此定位课程目录、判断 ready/downloading。
 
 ```json
-[{"teclId":10730,"name":"区块链技术及应用","dir":"blockchain-apps","canvasId":94157}, ...]
+[{"teclId":<teclId>,"name":"<课程名>","dir":"<目录>","canvasId":<id>}, ...]
 ```
 
-当前含：工程材料 / 区块链技术及应用 / 测试原理与技术 / 大数据算法与分析 / 工程流体力学（A类）/ 毛泽东思想和中国特色社会主义理论体系概论 / 设计与制造Ⅱ / 西方音乐文化史。
+示例部署共 8 门课（工科 / 文科各有），具体名称与 teclId 属于个人选课信息，本文档不列。
 
 ### 8.2 `<课>/manifest.json`
 
 ```json
-{"course":"区块链技术及应用","teclId":10730,"auth":"Bearer accessToken",
- "sessions":[{"id":136658,"time":"2026-09-15 10:00:00","week":2,
-   "label":"wk02_20260915_id136658","subtitle_lines":412,
+{"course":"<课程名>","teclId":<teclId>,"auth":"Bearer accessToken",
+ "sessions":[{"id":<sid>,"time":"2026-09-15 10:00:00","week":2,
+   "label":"wk02_20260915_id<sid>","subtitle_lines":412,
    "channels":[{"channel":"teacher1","viewNum":1,"duration_s":5700,
-                "file":"~/vod-research/<课程>/videos/wk02_20260915_id136658_1.mp4",
+                "file":"~/vod-research/<课程>/videos/wk02_20260915_id<sid>_1.mp4",
                 "size_bytes":1234567890}]}]}
 ```
 
@@ -409,7 +409,7 @@ python3 ~/vod-research/backend/vodctl.py status   # 看端口/pid/在监听的�
 curl -s  127.0.0.1:18080/api/version       # 先确认跑的是哪一版（v1.8 / pid / 超时值）
 curl -s  127.0.0.1:18080/api/courses | head -c 400
 curl -sI -H 'Range: bytes=0-1' \
-     127.0.0.1:18080/media/10730/videos/wk02_20260915_id136658_1.mp4   # 期望 206 + Content-Range
+     127.0.0.1:18080/media/<teclId>/videos/wk02_20260915_id<sid>_1.mp4   # 期望 206 + Content-Range
 curl -s  127.0.0.1:18080/api/stats
 curl -s  127.0.0.1:18080/api/progress
 ```

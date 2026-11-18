@@ -51,10 +51,9 @@ backend/vodctl.py start
 
 ## 长什么样
 
-![播放器](docs/player.png)
-
-> 左边大画面是教师视频，右上小窗是**课件图片**（这一路不发视频流），底部 `PPT 跳转` 是平台 AI 抽出的
-> 幻灯片节点（点一下直接跳到那一页），右侧原本是节次列表与逐句字幕（截图已裁掉）。
+> 本仓库**不含任何截图**。界面描述：左边大画面是教师视频，右上可拖拽的小窗是**课件图片**
+> （这一路不发视频流，按时间轴换图），底部 `PPT 跳转` 是平台抽出的幻灯片节点（点一下跳到那一页），
+> 右侧是节次列表与逐句字幕。
 
 ## 结构
 
@@ -162,15 +161,15 @@ python3 scripts/update_all.py --channels ppt
 
 # 然后把它压成图片 / PDF
 python3 scripts/emit_all_slides.py --course blockchain-apps
-python3 scripts/ppt_to_pdf.py blockchain-apps wk06_20261010_id174784_ppt.mp4 \
-        --from-nodes blockchain-apps/subtitles/wk06_20261010_id174784.nodes.json
+python3 scripts/ppt_to_pdf.py blockchain-apps wk06_20261010_id<sid>_ppt.mp4 \
+        --from-nodes blockchain-apps/subtitles/wk06_20261010_id<sid>.nodes.json
 ```
 
 ```bash
 # 路线 B：连视频都不下，只要 PDF → 先只拉节点（几 MB），再出图
 python3 backend/fetch_nodes.py                 # 拉每节的幻灯片时间点 + OCR 文本
-python3 scripts/ppt_to_pdf.py blockchain-apps wk06_20261010_id174784_ppt.mp4 \
-        --from-nodes blockchain-apps/subtitles/wk06_20261010_id174784.nodes.json \
+python3 scripts/ppt_to_pdf.py blockchain-apps wk06_20261010_id<sid>_ppt.mp4 \
+        --from-nodes blockchain-apps/subtitles/wk06_20261010_id<sid>.nodes.json \
         --dry-run                              # 先看要出几页
 ```
 
