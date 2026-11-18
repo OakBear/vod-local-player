@@ -84,6 +84,28 @@ def thumbnails(path, fps, workers=1):
     return arr
 
 
+def thumbnails_cached(path, fps):
+    """缩略图带磁盘缓存：同一个视频第二次跑直接读 .npz（一次解码 ~90 s）。"""
+    d = os.path.join(os.path.dirname(os.path.abspath(path)), '..', 'slides-cache')
+    d = os.path.normpath(d)
+    stamp = '%d_%d_%g' % (os.path.getsize(path), os.path.getmtime(path), fps)
+    cache = os.path.join(d, os.path.basename(path) + '.%s.npz' % stamp)
+    if os.path.exists(cache):
+        z = np.load(cache)
+        print('  缩略图命中缓存 %s' % cache)
+        return z['t']
+    arr = thumbnails(path, fps)
+    try:
+        os.makedirs(d)
+    except OSError:
+        pass
+    try:
+        np.savez_compressed(cache, t=arr)
+    except OSError:
+        pass
+    return arr
+
+
 def segment(thumbs, fps, thr, min_dur):
     """按相邻帧差异切段，返回 [(start_s, end_s, rep_index), ...]。"""
     n = len(thumbs)
@@ -205,6 +227,7 @@ def main(argv=None):
     ap.add_argument('--max', type=int, default=0)
     ap.add_argument('--width', type=int, default=1600)
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--no-cache', action='store_true')
     a = ap.parse_args(argv)
 
     video = a.video if os.path.isabs(a.video) else os.path.join(a.course_dir, 'videos', a.video)
@@ -213,7 +236,7 @@ def main(argv=None):
     t0 = time.time()
     dur = probe_duration(video)
     print('视频 %.1f min / %.0f MB  采样 %g fps' % (dur / 60, os.path.getsize(video) / 1e6, a.fps))
-    thumbs = thumbnails(video, a.fps)
+    thumbs = thumbnails_cached(video, a.fps)
     print('  缩略图 %d 张（%.1fs）' % (len(thumbs), time.time() - t0))
 
     segs = segment(thumbs, a.fps, a.thr, a.min_dur)
